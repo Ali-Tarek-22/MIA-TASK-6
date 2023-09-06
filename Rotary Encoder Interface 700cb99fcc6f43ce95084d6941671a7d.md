@@ -90,8 +90,10 @@ $f_m$ = max. frequency of the encoder.
 So:
 $ f_m = sn * s / c = 215 Hz$
 
- Since the cutoff frequency of a low-pass filter is typically set to be lower than the maximum frequency of the signal you want to preserve
+Since the cutoff frequency of a low-pass filter is typically set to be lower than the maximum frequency of the signal you want to preserve.
 So the cutoff frequency must be lower than $f_m$.
+
 A common rule of thumb is to set fc to a value that is a fraction of $f_m$, typically between 1/10 and 1/5.
 Let's choose $f_c = 1/10 * fmax$:
+
 So $f_c = (1/10) * 215 Hz ≈ 21.5 Hz$	
