@@ -1,0 +1,220 @@
+# MIA-TASK-6
+# Interfacing MPU-6050  Sensor
+
+In this code we are interfacing with a MPU-6050 sensor and calculating the angles of the sensor.
+
+# Include Important libraries
+
+ include the Wire library for I2C communication.
+
+```arduino
+#include <Wire.h>
+```
+
+# Define important addresses
+
+Define important addresses for the MPU-6050 sensor.
+
+```arduino
+//MPU-6050 Address
+#define MPU6050 0x68
+//Address of power managment register
+#define PWR_MGMT_1 0x6B
+//Accel register address
+#define ACC_XOUT_H 0x3B
+//Gyro register address
+#define GYRO_XOUT_H 0x43
+//Accel config address (for the full-scale range)
+#define ACCEL_CONFIG 0x1C
+//Gyro config address (for the full-scale range)
+#define GYRO_CONFIG 0x1B
+```
+
+# Define the necessary variables
+
+Define necessary variables including calibration values, buffer variables for storing angles, and output angles for yaw, pitch, and roll calculations.
+
+```arduino
+//Define important numbers
+#define N_Samples 200
+#define PI 3.14159
+#define A .96
+
+//Variables to store the time
+double Timer, Time, Prev_time, dt;
+//Variables to store the calibration values
+float Acc_x_Calibrated, Acc_y_Calibrated, Gyro_x_Calibrated, Gyro_y_Calibrated, Gyro_z_Calibrated;
+//Buffer variables to store the angles
+float Acc_Angle_x, Acc_Angle_y, Gyro_Angle_x, Gyro_Angle_y, Gyro_Angle_z;
+//Variables to store the output angles
+float yaw, pitch, roll;
+```
+
+# Setup Function
+
+The setup function initializes the communication with the MPU-6050 sensor, sets the full-scale range of the accelerometer and gyroscope, delays briefly, and then calls the `Mpu_Calibration` function to calibrate the sensor.
+
+The setup function begins the I2C transmission to the MPU-6050 sensor using the `Wire.beginTransmission` function. The power management register is set to 0x00, which activates the sensor. The full-scale range of the accelerometer and gyroscope are set to their default values of ±2g and ±250°/s, respectively, using the `ACCEL_CONFIG` and `GYRO_CONFIG` registers.
+
+The function then delays for 20 milliseconds to ensure the sensor has sufficient time to start up, and calls the `Mpu_Calibration` function to calibrate the sensor.
+
+```arduino
+void setup() {
+  Wire.begin();
+  Serial.begin(1000);
+  //Activate the MPU-6050
+  Wire.beginTransmission(MPU6050);
+  Wire.write(PWR_MGMT_1);
+  Wire.write(0x00);
+  Wire.endTransmission();
+
+  //Set full-scale range of ACCEL_CONFIG to ±2g (default)
+  Wire.beginTransmission(MPU6050);
+  Wire.write(ACCEL_CONFIG);
+  //Set the register bits as 0b00000000
+  Wire.write(0x00); 
+  Wire.endTransmission(true);
+  
+  //Set full-scale range of GYRO_CONFIG to ±250°/s (default)
+  Wire.beginTransmission(MPU6050);
+  Wire.write(GYRO_CONFIG);
+  //Set the register bits as 0b00000000
+  Wire.write(0x00);
+  Wire.endTransmission(true);
+
+  delay(20);
+  //Call calibration function
+  Mpu_Calibration();
+}
+```
+
+# Calibration function
+
+This function is used to calibrate the MPU-6050 sensor.
+
+The `Mpu_Calibration` function first defines three variables to hold the sum of readings from the accelerometer's x, y, and z axes. It then enters a loop that iterates the specified number of samples of readings. Within the loop, it reads the accelerometer and gyroscope values, adds them to the sum variables, and calculates the calibrated accelerometer values.
+
+After the loop completes, the function divides the sum values by the number of samples to get the mean values. It then sets the calibrated values for the accelerometer and gyroscope, which will be used for subsequent calculations.
+
+This calibration function helps to ensure that the readings from the sensor are as accurate as possible, which is necessary for calculating the angles of the sensor.
+
+```arduino
+void Mpu_Calibration(){
+  //Define necessary variables
+  float Acc_x_sum = 0;
+  float Acc_y_sum = 0;
+  float Acc_z_sum = 0;
+
+  //Loop for the required number of samples
+  for(int i = 0; i < N_Samples; i++)
+  {
+    //Get ACCEL readings
+    Serial.println("Begin " + String(i));
+    Wire.beginTransmission(MPU6050);
+    Wire.write(ACC_XOUT_H);
+    Wire.endTransmission();
+    Wire.requestFrom(MPU6050, 6);
+    while(Wire.available()<6);
+    Acc_x_sum += (Wire.read() << 8 | Wire.read()) / 16384.0;
+    Acc_y_sum += (Wire.read() << 8 | Wire.read()) / 16384.0;
+    Acc_z_sum += (Wire.read() << 8 | Wire.read()) / 16384.0;
+
+    //Get GYRO readings  
+    Wire.beginTransmission(MPU6050);
+    Wire.write(GYRO_XOUT_H);
+    Wire.endTransmission();
+    Wire.requestFrom(MPU6050, 6);
+    while(Wire.available()<6);
+    Gyro_x_Calibrated += (Wire.read() << 8 | Wire.read()) / 131.0;
+    Gyro_y_Calibrated += (Wire.read() << 8 | Wire.read()) / 131.0;
+    Gyro_z_Calibrated += (Wire.read() << 8 | Wire.read()) / 131.0;
+
+    Acc_x_Calibrated += (atan(Acc_y_sum / sqrt(pow(Acc_x_sum, 2) + pow(Acc_z_sum, 2))) * 180 / PI);
+    Acc_y_Calibrated += (atan(-1 * Acc_x_sum / sqrt(pow(Acc_y_sum, 2) + pow(Acc_z_sum, 2))) * 180 / PI);
+
+  }
+  //Divide the mean by the number of samples
+  Acc_x_Calibrated /= N_Samples;
+  Acc_y_Calibrated /= N_Samples;
+  Gyro_x_Calibrated /= N_Samples;
+  Gyro_y_Calibrated /= N_Samples;
+  Gyro_z_Calibrated /= N_Samples;
+}
+```
+
+# The loop function
+
+This function is used to calculate the angles from the data taken from the MPU-6050 sensor.
+
+this function starts with defining several variables to store accelerometer (`Acc_x`, `Acc_y`, `Acc_z`) and gyroscope (`Gyro_x`, `Gyro_y`, `Gyro_z`) readings, as well as variables for calculated angles.
+
+Then it starts to get the Accelerometer readings. First It initiates communication with the MPU6050 sensor then requests and reads the accelerometer data (X, Y, Z axes) from the sensor and finally converts the raw sensor data to meaningful acceleration values and stores them in `Acc_x`, `Acc_y`, and `Acc_z`.
+
+After getting the Accelerometer values it Calculates roll and pitch angles using trigonometric functions and the accelerometer data. These calculations involve taking the arctangent of ratios of accelerometer readings.
+
+Calculate the time difference (`dt`) since the previous loop iteration. This time difference is used for integrating gyroscope readings.
+
+Get the Gyroscope readings in a similar method.  Initiate communication with the MPU6050 sensor again, request and read the gyroscope data (X, Y, Z axes) from the sensor. Convert the raw sensor data to angular velocity values and store them in `Gyro_x`, `Gyro_y`, and `Gyro_z`.
+
+ Using a complementary filter for angle calculations. First apply a complementary filter to calculate the roll and pitch angles. Combine accelerometer and gyroscope data to get more stable angle measurements. The yaw angle is directly obtained from the gyroscope.
+
+Finally display the calculated roll, pitch, and yaw angles in the serial monitor for debugging and monitoring purposes.
+
+The code operates in the Arduino **`loop()`** function, meaning it continuously reads sensor data and calculates angles.
+
+```arduino
+void loop() {
+  //Define necessary variables
+  float Acc_x = 0;
+  float Acc_y = 0;
+  float Acc_z = 0;
+  float Gyro_x = 0;
+  float Gyro_y = 0;
+  float Gyro_z = 0;
+    
+  //Get ACCEL readings
+  Wire.beginTransmission(MPU6050); 
+  Wire.write(ACC_XOUT_H);
+  Wire.endTransmission();
+  Wire.requestFrom(MPU6050, 6);
+  while(Wire.available()<6);
+  Acc_x = (Wire.read() << 8 | Wire.read()) / 16384.0;
+  Acc_y = (Wire.read() << 8 | Wire.read()) / 16384.0;
+  Acc_z = (Wire.read() << 8 | Wire.read()) / 16384.0;
+  //Calulate the angles
+  Acc_Angle_x = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * 180 / PI) - Acc_x_Calibrated;
+  Acc_Angle_y = (atan(-1 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * 180 / PI) - Acc_y_Calibrated;
+
+  //Calculate dt for the Complimentry Filter 
+  Prev_time = Time;
+  Time = millis();
+  //Divide by 1000 to get dt in seconds
+  dt = (Time - Prev_time) / 1000;
+
+  //Get GYRO readings
+  Wire.beginTransmission(MPU6050); 
+  Wire.write(GYRO_XOUT_H);
+  Wire.endTransmission();
+  Wire.requestFrom(MPU6050, 6);
+  while(Wire.available()<6);
+  Gyro_x = (Wire.read() << 8 | Wire.read()) / 131.0 - Gyro_x_Calibrated;
+  Gyro_y = (Wire.read() << 8 | Wire.read()) / 131.0 - Gyro_y_Calibrated;
+  Gyro_z = (Wire.read() << 8 | Wire.read()) / 131.0 - Gyro_z_Calibrated;
+
+  //Use Complimentry Filter to claculate the angles
+  Gyro_Angle_x += Gyro_x * dt;
+  Gyro_Angle_y += Gyro_y * dt;
+  Gyro_Angle_z += Gyro_z * dt;
+
+  //Get the final values
+  roll = A * Gyro_Angle_x + (1 - A) * Acc_Angle_x;
+  pitch = A * Gyro_Angle_y + (1 - A) * Acc_Angle_y;
+  yaw = Gyro_Angle_z;
+
+//Display the angles
+  Serial.println("Roll angle: " + String(roll));
+  Serial.println("Pitch angle: " + String(pitch));
+  Serial.println("Yaw angle: " + String(yaw));
+  Serial.println(("--------------------"));
+}
+```
