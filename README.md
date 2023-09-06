@@ -217,4 +217,11 @@ void loop() {
   Serial.println("Yaw angle: " + String(yaw));
   Serial.println(("--------------------"));
 }
+
+
+# MPU-6050 vs Noise
+To eliminate the surrounding noise apply a low-pass filter to help mitigate the effects of the noise. 
+
+This will allow low-frequency signals to pass through while attenuating higher-frequency noise.
+The cutoff frequency from the datasheet is 1kf for the Accelerometer.
 ```
